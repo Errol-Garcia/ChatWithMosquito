@@ -26,9 +26,10 @@ include_once "$root/chat/services/contacts.php";
 
                         foreach ($contacts as $contact) {
                             echo <<<HTML
-                                    <li class="clearfix" id="contact_$contact[chat]" onclick="selectContact($('#contact_'+$contact[chat]).attr('id'), $('#name_'+$contact[chat]).html(), $('#image_'+$contact[chat]).attr('src'), $_SESSION[id]);">
+                                    <li class="clearfix" id="contact_$contact[chat]" onclick="selectContact($('#contact_'+$contact[chat]).attr('id'), $('#name_'+$contact[chat]).html(), $('#image_'+$contact[chat]).attr('src'), $_SESSION[id], $('#id_'+$contact[chat]).html());">
                                         <img src="$contact[image]" alt="avatar" id="image_$contact[chat]">
                                         <div class="about">
+                                            <div hidden class="name" id="id_$contact[chat]">$contact[id]</div>
                                             <div class="name" id="name_$contact[chat]">$contact[name]</div>
                                             <div class="status"><i class="bi bi-person-add"></i> left 7 mins ago </div>
                                         </div>
@@ -52,14 +53,19 @@ include_once "$root/chat/services/contacts.php";
 
 <script>
     // Configuración del cliente MQTT
-    const broker = "localhost";
-    const port = 8083 //8081; // Puerto por defecto para WebSockets    
+    const broker = "10.40.40.25";
+    // const broker = "localhost";
+    const port = 8083 //8081; // Puerto por defecto para WebSockets  
+    // const broker = "test.mosquitto.org";
+    // const port = 8083 //8081; // Puerto por defecto para WebSockets  
     const qos = 1; // Calidad de servicio (QoS)
     var name = "";
     var contacts = [];
     var clients = [];
     // var messages = [];
     var currentUser = 0;
+    var currentContact = 0;
+    var chat = 0;
 
     $(document).ready(function() {
         url = "/chat/services/getContacts.php";
@@ -98,12 +104,38 @@ include_once "$root/chat/services/contacts.php";
     // Función de recepción de mensajes
     onMessageArrived = (message) => {
         console.log("Message arrive: " + message.destinationName + ": " + message.payloadString);
-        client_name = message.destinationName.split('/')[3];
-        console.log(client_name);
+        client_id = message.destinationName.split('/')[2];
+        // client_name = message.destinationName.split('/')[3];
+        // console.log(client_name);
+        console.log(client_id.split('_')[1]);
 
-        if (message.payloadString == 'enviado') {
+        id = client_id.split('_')[1];
+        console.log(chat);
+
+        // if (message.payloadString == 'enviado') {
+        //     // generar_numeros();
+        //     console.log(message.payloadString);
+        // }
+
+        // if (client_name == 'enviado') {
+        //     messageContainer = document.getElementById('message-container');
+        //     messageContainer.innerHTML = "";
+        //     // messageSent("https://bootdey.com/img/Content/avatar/avatar1.png", message.payloadString, "123");
+        //     loadMessage(id);
+
+        //     // } else {
+        //     // messageReceived(message.payloadString, "123");
+        // }
+
+        if (id == chat) {
             // generar_numeros();
             console.log(message.payloadString);
+
+            if (message.payloadString == 'insertado') {
+                messageContainer = document.getElementById('message-container');
+                messageContainer.innerHTML = "";
+                loadMessage(client_id);
+            }
         }
     };
 
@@ -127,11 +159,12 @@ include_once "$root/chat/services/contacts.php";
         });
     };
 
-    function selectContact(id, name, image, user_id) {
+    function selectContact(id, name, image, user_id, user_selected) {
         currentUser = user_id;
         console.log('Contacto ' + name + ' seleccionado');
         console.log('image: ' + image);
         console.log('id: ' + id);
+        currentContact = user_selected;
 
         loadChat(name, image);
         loadMessage(id);
@@ -172,13 +205,13 @@ include_once "$root/chat/services/contacts.php";
                 </div>
 
                 <div class="chat-message clearfix">
-                    <div class="input-group mb-0">
-                        <div class="input-group-prepend">
-                            <span class="input-group-text"><i class="fa fa-send"></i></span>
-                        </div>
+                        <form method="post" class="input-group mb-0" id="form_chat">
+                            <div class="input-group-prepend">
+                                <button type="submit" class="input-group-text"><i class="fa fa-send"></i></button>
+                            </div>
 
-                        <input type="text" class="form-control" placeholder="Enter text here...">
-                    </div>
+                            <input type="text" id="txt_message" class="form-control" placeholder="Enter text here...">
+                        </form>
                 </div>
             `;
     }
@@ -211,6 +244,7 @@ include_once "$root/chat/services/contacts.php";
     }
 
     function loadMessage(chat_id) {
+        chat = chat_id.split('_')[1];;
         id = chat_id.split('_')[1];
         messages = [];
         url = "/chat/services/getMessages.php";
@@ -236,4 +270,71 @@ include_once "$root/chat/services/contacts.php";
             console.log("Response: ", response);
         });
     }
+
+    $(document).on('submit', '#form_chat', function(event) {
+        event.preventDefault();
+        var message = $('#txt_message').val();
+        // var name = $('#name').val();
+
+        url = "/chat/services/add.php";
+
+        console.log("message " + message);
+        console.log("user " + currentUser);
+        console.log("contact " + currentContact);
+        console.log("chat " + chat);
+
+        // $.ajax({
+        //     url: url,
+        //     method: "POST",
+        //     // data: new FormData(this),
+        //     data: {
+        //         message: id,
+        //         send_date: "123",
+        //         pub_id: currentUser,
+        //         sub_id: currentContact,
+        //         chat_id: chat
+        //     },
+        //     dataType: 'json',
+        //     success: function(data) {
+        //         console.log(data);
+        //         // const message = new Paho.MQTT.Message("insertado");
+        //         // message.destinationName = topicPublish;
+        //         // message.qos = qos;
+        //         // client.send(message);
+        //         // console.log("Mensaje publicado en " + topicPublish);
+        //     }
+        // });
+
+        $.ajax({
+            url: url,
+            method: "POST",
+            // data: new FormData(this),
+            data: {
+                message: message,
+                pub_id: currentUser,
+                sub_id: currentContact,
+                chat_id: chat
+            },
+            dataType: 'json',
+        }).done(function(response) {
+            // console.log(response);
+
+
+        }).fail(function(response) {
+            console.log("Response 1: ", response);
+        });
+
+        topicPublish = "udenar/chat/contact_" + chat + "/";
+
+        console.log(topicPublish);
+
+        const message2 = new Paho.MQTT.Message("insertado");
+        message2.destinationName = topicPublish;
+        message2.qos = qos;
+        client = clients[id];
+        client.send(message2);
+        console.log("Mensaje publicado en " + topicPublish);
+
+        $('#txt_message').val("");
+    });
 </script>
